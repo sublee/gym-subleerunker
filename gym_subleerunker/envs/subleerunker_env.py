@@ -1,6 +1,9 @@
-from ghost import Ghost
+import time
+
 import gym
 from gym import spaces
+from selenium import webdriver
+from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 
 
 LEFT  = 37
@@ -15,13 +18,17 @@ class SubleerunkerEnv(gym.Env):
     observation_space = spaces.Box(low=0, high=256**3, shape=(320, 240))
     reward_range = (0, float('inf'))
 
+    driver = None
+
     def reset(self):
-        self.session = Ghost().start(viewport_size=(480, 640)).__enter__()
+        if self.driver is None:
+            self.driver = webdriver.Remote(
+                'http://127.0.0.1:4444/wd/hub',
+                desired_capabilities=DesiredCapabilities.CHROME)
 
-        self.session.open('http://nop.subl.ee/subleerunker/?fps=0')
-        self.session.wait_for_page_loaded()
-
-        self.tick()
+        self.driver.get('http://nop.subl.ee/subleerunker/')
+        self.started_at = time.time()
+        self.tick(0)
         self.start()
 
     def step(self, action):
@@ -32,7 +39,7 @@ class SubleerunkerEnv(gym.Env):
         elif action == 2:
             self.right()
 
-        self.tick()
+        self.tick(time.time() - self.started_at)
         state = self.state()
 
         observation = state['pixels']
@@ -40,36 +47,34 @@ class SubleerunkerEnv(gym.Env):
         done = state['dead']
         info = {}
 
-        print(done)
-
         return observation, reward, done, info
 
     def render(self, mode='human', close=False):
-        if close:
-            self.session.hide()
-        else:
-            self.session.show()
+        pass
 
     # ---
 
     def js(self, code):
-        return self.session.evaluate(code)
+        return self.driver.execute_script(code)
 
     def start(self):
         self.js('game.startGameplay()')
 
-    def tick(self):
-        self.js('game.tick()')
+    def tick(self, time=None):
+        return
+        if time is None:
+            self.js('game.tick()')
+        else:
+            self.js('game.tick(%.3f)' % (time * 1000))
 
     def state(self):
-        state, __ = self.js('''
-        (function() { return {
-            pixels: game.renderer.extract.pixels(game.renderer._lastObjectRendered),
+        return self.js('''
+        return {
+            pixels: [],
             dead:   Boolean(game.player && game.player.dead),
             score:  game.scores.current,
-        }; })();
+        };
         ''')
-        return state
 
     def left(self):
         self.js('''
