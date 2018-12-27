@@ -6,10 +6,6 @@ from selenium import webdriver
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 
 
-LEFT  = 37
-RIGHT = 38
-
-
 class SubleerunkerEnv(gym.Env):
 
     metadata = {'render.modes': ['human']}
